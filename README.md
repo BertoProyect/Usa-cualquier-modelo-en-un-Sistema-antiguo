@@ -69,11 +69,39 @@ CODE="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
 "$CODE" --install-extension /tmp/claude-ext.vsix
 ```
 
-Si VS Code llega a descargar/instalar automáticamente la 2.x, bórrala a mano:
+#### Evita que la CLI reinstale la extensión 2.x (muy importante)
+
+Aunque tengas `extensions.autoUpdate: false`, **la propia CLI de Claude Code** ejecuta `code --install-extension anthropic.claude-code --force` cada vez que se conecta a VS Code (al abrir VS Code, recargar la ventana o lanzar `claude` en su terminal). Eso instala la última 2.x encima de la 1.0.31, y el error `dyld: Symbol not found` vuelve en el siguiente arranque (típicamente: "anoche funcionaba y esta mañana no").
+
+Puedes confirmarlo en los logs de VS Code:
 
 ```bash
-rm -rf ~/.vscode/extensions/anthropic.claude-code-2.*-darwin-x64
+grep -l '"install-extension":\["anthropic.claude-code"\]' ~/Library/Application\ Support/Code/logs/*/cli.log
 ```
+
+Desactívalo de dos formas (pon las dos):
+
+1. En `~/.claude.json`, añade en el nivel raíz:
+   ```json
+   "autoInstallIdeExtension": false
+   ```
+2. En `~/.claude/settings.json`, dentro de `env`:
+   ```json
+   "env": {
+     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1"
+   }
+   ```
+
+Después reinstala la 1.0.31 (sobrescribe la 2.x) y guarda una copia del `.vsix` para la próxima vez:
+
+```bash
+"$CODE" --install-extension /tmp/claude-ext.vsix --force
+"$CODE" --list-extensions --show-versions | grep claude
+# Debe imprimir: anthropic.claude-code@1.0.31
+cp /tmp/claude-ext.vsix ~/claude-code-1.0.31.vsix
+```
+
+Reinicia VS Code (`Cmd+Q` y abrir de nuevo).
 
 ### 3. CLI Claude Code 2.1.112 con versión parcheada
 
@@ -128,6 +156,7 @@ Mismos IDs disponibles para forzar a mano:
 
 - Si Anthropic empieza a validar **capacidades reales** (no solo el número de versión), el parche deja de funcionar y hay que actualizar macOS a 11+.
 - Cada vez que VS Code o la extensión se autoactualice, volverás al punto de partida. Mantén los flags de `settings.json` desactivados.
+- Si vuelve el `dyld: Symbol not found` en VS Code, casi seguro la CLI ha reinstalado la extensión 2.x: revisa que `autoInstallIdeExtension` y `CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL` sigan puestos y reinstala la 1.0.31.
 
 ## Revertir
 
