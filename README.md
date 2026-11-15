@@ -11,7 +11,10 @@ Guía para usar **Claude Code** con el modelo **Claude Opus 5.5** (y el resto de
   Expected in: /usr/lib/libc++.1.dylib
   ```
 - Lo mismo le pasa a la extensión de VS Code `anthropic.claude-code` a partir de la 2.x: trae ese mismo binario.
-- Y VS Code, desde la 1.95 aproximadamente, requiere macOS 11+/12+.
+- Y VS Code, desde la 1.95 aproximadamente, requiere macOS 11+/12+. Si se autoactualiza, deja de abrir con este aviso:
+  ```
+  Tienes instalada la versión 10.15.7 de macOS. Esta aplicación requiere macOS 12.0 o posterior.
+  ```
 - Pero el backend de Anthropic exige **CLI ≥ 2.1.280** para hablar con `claude-opus-5-5`, si no responde:
   ```
   {"error_code":"claude_code_version_too_old"}
@@ -46,7 +49,9 @@ xattr -dr com.apple.quarantine "/Applications/Visual Studio Code.app"
 # Debe imprimir: 1.94.2
 ```
 
-Bloquea auto-updates (si no, VS Code intentará subirse a una versión que no arranca). En `~/Library/Application Support/Code/User/settings.json`:
+> **Nota:** la 1.97.2 (`https://update.code.visualstudio.com/1.97.2/darwin/stable`, Intel) también arranca en Catalina (`LSMinimumSystemVersion` 10.15). Sirve como alternativa si necesitas algo más reciente que la 1.94.2.
+
+Bloquea auto-updates (si no, VS Code intentará subirse a una versión que no arranca y verás el aviso de "requiere macOS 12.0"). Desde la interfaz: `Cmd+,` → busca `update mode` → **Update: Mode** = `none` → reinicia VS Code con `Cmd+Q`. O a mano en `~/Library/Application Support/Code/User/settings.json`:
 
 ```json
 {
