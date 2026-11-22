@@ -176,7 +176,17 @@ Object.assign(swift, {
   surfaceSenderImagePath: () => "",
   computerUse,
   notifications,
-  keychain: {},
+  keychain: {
+    deriveBrowserSafeStorageKey: (browser) => new Promise((resolve) => {
+      const svc = { chrome: ["Chrome Safe Storage", "Chrome"], chromium: ["Chromium Safe Storage", "Chromium"], brave: ["Brave Safe Storage", "Brave"], edge: ["Microsoft Edge Safe Storage", "Microsoft Edge"] }[browser];
+      if (!svc) return resolve({ status: "not_found", osStatus: -25300 });
+      execFile("/usr/bin/security", ["find-generic-password", "-w", "-s", svc[0], "-a", svc[1]], { encoding: "utf8" }, (err, out) => {
+        if (err) { const st = err.code === 44 ? "not_found" : err.code === 128 ? "user_canceled" : err.code === 51 ? "denied" : "error"; return resolve({ status: st, osStatus: err.code === 44 ? -25300 : err.code === 128 ? -128 : -25293 }); }
+        const pw = out.replace(/\n$/, ""); if (!pw) return resolve({ status: "not_found", osStatus: -25300 });
+        resolve({ status: "ok", key: require("node:crypto").pbkdf2Sync(pw, "saltysalt", 1003, 16, "sha1") });
+      });
+    }),
+  },
   networkPath: { subscribe: () => false, unsubscribe: noop, awakeMilliseconds: () => Math.round(process.uptime() * 1000) },
   memoryPressure: { subscribe: () => false, unsubscribe: noop },
   desktop: { getOpenWindows: () => [], captureScreenshot: async () => null, setQuickEntrySharing: async () => {} },
@@ -187,7 +197,26 @@ Object.assign(swift, {
   api: { setCredentials: noop },
   midnightOwl: { setEnabled: noop },
   wakeScheduler: { status: async () => ({ status: "unavailable" }), openSettings: noop },
-  trayUsage: { popUp: noop },
+  trayUsage: {
+    popUp: async (title, windows, header, footer, actions) => {
+      const { Menu } = electron();
+      const act = (it) => ({ label: it.hint ? `${it.label}  (${it.hint})` : it.label, sublabel: it.detail, enabled: it.enabled !== false, click: () => swift.emit("trayUsageAction", it.id) });
+      const bar = (f) => { const n = Math.round(Math.min(Math.max(f || 0, 0), 1) * 20); return "\u2588".repeat(n) + "\u2591".repeat(20 - n); };
+      const t = [];
+      if (title) t.push({ label: title, enabled: false }, { type: "separator" });
+      for (const w of windows || []) {
+        t.push({ label: w.label, enabled: false });
+        t.push({ label: w.showsBar === false ? `   ${w.detail || ""}` : `   ${bar(w.fraction)}  ${w.detail || ""}`, enabled: false });
+      }
+      if ((windows || []).length) t.push({ type: "separator" });
+      for (const it of actions || []) t.push(act(it));
+      if ((actions || []).length) t.push({ type: "separator" });
+      for (const it of header || []) t.push(act({ ...it, label: it.detail ? `${it.label} \u00b7 ${it.detail}` : it.label, detail: undefined }));
+      for (const it of footer || []) t.push(act(it));
+      const menu = Menu.buildFromTemplate(t), tray = globalThis.__ccTray;
+      if (tray && !tray.isDestroyed()) tray.popUpContextMenu(menu); else menu.popup();
+    },
+  },
   updater: { getShipItJobInfo: () => null, removeShipItJob: noop },
   permissionFixer: { run: async () => ({ success: false, error: "unsupported on macOS 10.15" }) },
   tearOffHalo: { begin: noop, end: noop, setArmed: noop },

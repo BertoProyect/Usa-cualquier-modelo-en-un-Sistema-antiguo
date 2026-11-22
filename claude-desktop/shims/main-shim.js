@@ -79,6 +79,7 @@ function patchSession(s) {
   };
   for (const C of [electron.View, electron.WebContentsView]) if (C && !C.prototype.setBorderRadius) C.prototype.setBorderRadius = function () {};
 })();
+for (const k of ["on", "setImage", "setToolTip"]) { const T = electron.Tray.prototype, o = T[k]; T[k] = function (...a) { globalThis.__ccTray = this; return o.apply(this, a); }; }
 app.on("session-created", patchSession);
 app.whenReady().then(() => patchSession(electron.session.defaultSession));
 if (process.platform === "darwin") app.whenReady().then(() => setTimeout(() => {

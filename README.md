@@ -213,6 +213,8 @@ Todo el código está en la carpeta [`claude-desktop/`](claude-desktop). Lo que 
 | Claude Code nativo (pestaña Code) | Binario para macOS 13: faltan símbolos de libc++, libSystem e ICU | Dylibs puente `compat/` + `install_name_tool` automático (parte 3) |
 | Firma | La firma ad-hoc cambia en cada build: pide el llavero, bloquea la red y pierde permisos | Identidad local estable **"Claude Port Local Signing"** |
 | Actualizaciones | El auto-updater instalaría la versión que no arranca | Desactivado; se actualiza con `update.sh` |
+| `node:sqlite` (Node 22) | La importación de cookies del navegador lo usa | Polyfill en `node-shim.js` sobre `/usr/bin/sqlite3` (modo `quote`, parámetros enlazados) |
+| Menú de la barra de menús | `trayUsage.popUp` es nativo (Swift) | Menú de Electron con barras de 5 horas y semanal + "Se restablece en…"; `inject.js` lo abre con clic izquierdo |
 | Icono | El original es Liquid Glass (Assets.car) | `icon/ext.m` lo renderiza a `.icns` desde el propio paquete oficial |
 
 ### 2.0 Requisitos
@@ -261,6 +263,8 @@ cd Usa-cualquier-modelo-en-un-Sistema-antiguo/claude-desktop
    - *Accesibilidad*: Preferencias del Sistema → Seguridad y privacidad → Privacidad → Accesibilidad → candado → marca Claude (o «+» → `/Applications/Claude.app`).
    - *Grabación de pantalla*: misma ventana → Grabación de pantalla. En Catalina una app solo aparece en la lista después de intentar capturar; el port lo intenta solo al arrancar. Si aun así no sale, pulsa «+» y añade `/Applications/Claude.app`. Reinicia Claude después.
 5. **Navegador interno**: ya funciona (navegar, leer la página, clics, formularios, capturas, consola y red). Las capturas y `read_page` necesitan que el panel del navegador esté **visible**.
+6. **Importar sesiones de Firefox/Chrome** al navegador interno: funciona. Con Chrome, macOS pedirá acceso a "Chrome Safe Storage" (pulsa Permitir). Si el aviso de importar no aparece, casi siempre es que esa sesión arrancó con la red rota por el llavero: reinicia Claude.
+7. **Icono de la barra de menús**: al pulsarlo muestra el límite de 5 horas y el semanal, con el porcentaje y cuánto falta para que se restablezcan.
 
 > **Consejo de red:** si alguna web abre en `chrome-error` en el navegador interno, comprueba si el Mac la resuelve (`curl -I https://example.com`). Nos pasó con el DNS de Vodafone (212.166.x.x), que no resolvía `example.com`. Se arregla con DNS públicos:
 > ```bash
@@ -277,7 +281,7 @@ git pull          # por si hay parches nuevos
 ./update.sh       # descarga, porta e instala si hay versión nueva (--force para rehacerla igual)
 ```
 
-Como la firma es siempre la misma, el llavero y los permisos (Accesibilidad, Grabación de pantalla) se conservan entre versiones.
+Como la firma es siempre la misma, los permisos (Accesibilidad, Grabación de pantalla) se conservan entre versiones. El llavero, en cambio, autoriza por *cdhash* (cambia en cada build), así que `update.sh` te pide la contraseña de inicio de sesión para autorizar la nueva build en "Claude Safe Storage". Si te lo saltas, Claude pedirá el llavero al arrancar: pulsa **Permitir siempre** y **reinicia Claude** (esa primera sesión se queda sin red).
 
 Si tras actualizar algo falla, mira `~/Library/Logs/Claude/main.log` y busca `is not a function`, `Insufficient number of arguments`, `patch not applied` o `Sentry caught`: casi siempre es una API nueva de Electron que hay que rellenar en `shims/main-shim.js`. Para depurar, `main-shim.js` carga `~/.claude-port-debug.js` si existe.
 
@@ -329,7 +333,12 @@ Necesita que `/Applications/Claude.app` (el port) esté instalado. La CLI parche
 | VS Code: "requiere macOS 12.0" | Auto-actualización de VS Code | VS Code 1.94.2 + `update.mode: none` |
 | La extensión vuelve a la 2.x sola | La CLI ejecuta `code --install-extension … --force` | `autoInstallIdeExtension: false` + `CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1` |
 | `esbuild` no arranca | Binario nativo para macOS más nuevo | `esbuild-wasm` |
-| Toda la red del proceso principal da `net::ERR_FAILED` y se congela 20–60 s | Firma ad-hoc nueva en cada build → aviso del llavero "Claude Safe Storage" | Identidad de firma estable + **Permitir siempre** |
+| Toda la red del proceso principal da `net::ERR_FAILED` y se congela 20–60 s | Aviso del llavero "Claude Safe Storage" al arrancar: su lista de particiones va por *cdhash*, que cambia en cada build | `update.sh` añade el cdhash nuevo con `security set-generic-password-partition-list`; si no, **Permitir siempre** y reiniciar |
+| El icono de la barra de menús no muestra nada | `trayUsage.popUp` era un stub; el clic izquierdo abría la entrada rápida | Menú propio en `claude-swift.js` + parche `trayFix` en `inject.js` |
+| Menú de uso: "Uso no disponible" | Sesión arrancada con la red rota (llavero) | Reiniciar Claude tras autorizar el llavero |
+| Importar cookies: `ERR_SQLITE_UNAVAILABLE` | Electron 32 (Node 20) no trae `node:sqlite` | Polyfill sobre `/usr/bin/sqlite3` |
+| Importar desde Chrome: "keychain binding unavailable" | Faltaba `keychain.deriveBrowserSafeStorageKey` en claude-swift | `security find-generic-password` + PBKDF2 (`saltysalt`, 1003, 16 bytes) |
+| No sale el aviso de importar cookies | Los flags remotos no cargan si la red está rota | Reiniciar Claude con la red bien |
 | "Conectar con tu ordenador" / navegador: bucle "transport flag flipped to net — reconnecting" | Electron 32 no tiene `net.WebSocket` | `inject.js` fuerza el transporte `ws` |
 | `TypeError: Cannot create proxy with a non-object` | El sustituto de claude-swift no tenía `vm` | Stub de `vm` (sin virtualización) |
 | Sin notificaciones | claude-swift no carga | Notificaciones con `Electron.Notification` |

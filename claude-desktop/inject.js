@@ -31,3 +31,10 @@ fs.copyFileSync(path.join(process.argv[3],'claude-swift.js'),path.join(process.a
 let cuFix=0;for(const n of fs.readdirSync(B)){if(!/\.js$/.test(n))continue;const f=path.join(B,n);let s=fs.readFileSync(f,'utf8');const m=/isMacosBelowComputerUseFloor: \(\) => (\w+)/.exec(s);if(!m)continue;
  const re=new RegExp(`(function ${m[1]}\\(\\) \\{\\s*return )process\\.platform === "darwin" && \\w+\\(\\)\\.major < 14;`);const s2=s.replace(re,'$1false;');if(s2!==s){fs.writeFileSync(f,s2);cuFix++}}
 if(!cuFix)throw new Error('computer-use floor patch not applied');console.log({cuFix});
+
+// Menú de uso en la barra de menús: siempre activo y también con clic izquierdo (la entrada rápida necesita macOS 14)
+let trayFix=0;for(const n of fs.readdirSync(B)){if(!/\.js$/.test(n))continue;const f=path.join(B,n);let s=fs.readFileSync(f,'utf8');if(!s.includes('"[tray-usage] swift popUp unavailable or failed"'))continue;
+ let s2=s.replace(/(function \w+\(\) \{\s*return )\w+\("1109029378"\);/,'$1true;');
+ s2=s2.replace(/(\w+)\.on\("click", \(\(\) => \{\s*\w+\(\) \|\| \w+\(\);\s*\}\)\), (\1\.on\("right-click")/,'$1.on("click", () => $1.emit("right-click")), $2');
+ if(s2.split('emit("right-click")').length>1&&!/return \w+\("1109029378"\)/.test(s2)){fs.writeFileSync(f,s2);trayFix++}}
+if(!trayFix)throw new Error('tray usage patch not applied');console.log({trayFix});
