@@ -85,5 +85,41 @@ app.whenReady().then(() => patchSession(electron.session.defaultSession));
 if (process.platform === "darwin") app.whenReady().then(() => setTimeout(() => {
   try { if (electron.systemPreferences.getMediaAccessStatus("screen") !== "granted") electron.desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 16, height: 16 } }).catch(() => {}); } catch (e) {}
 }, 4000));
+// En 10.15 la vista de claude.ai a veces nace con el compositor parado (visibilityState "hidden",
+// requestAnimationFrame no avanza) y la ventana se queda en el esqueleto. Pasa al activar la ventana mientras arranca.
+// Remedio: alternar la visibilidad de la vista (la marca visible) y, si sigue parada, reiniciar su renderer,
+// que nace ya visible. Ni recargar ni ocultar/mostrar la ventana lo arreglan.
+app.on("web-contents-created", (_e, wc) => {
+  let stage = 0;
+  const ownerWin = () => electron.BrowserWindow.getAllWindows().find(w => w.contentView && w.contentView.children.some(v => v.webContents === wc));
+  const probe = () => Promise.race([
+    wc.executeJavaScript("new Promise(r => { requestAnimationFrame(() => r('ok')); setTimeout(() => r('stuck'), 3000); })"),
+    new Promise(r => setTimeout(() => r("busy"), 8000)),
+  ]).catch(() => "busy");
+  const toggle = w => { const v = w.contentView.children.find(c => c.webContents === wc); if (v) { v.setVisible(false); v.setVisible(true); } };
+  wc.on("did-finish-load", () => {
+    if (!/^https:\/\/claude\.ai\//.test(wc.getURL()) || stage >= 3) return;
+    let n = 0, oks = 0;
+    const tick = async () => {
+      if (wc.isDestroyed() || ++n > 40) return;
+      const w = ownerWin();
+      if (!w || !w.isVisible() || w.isMinimized() || !w.isFocused()) return setTimeout(tick, 2000);
+      const r = await probe();
+      if (r === "ok") { if (++oks < 3) setTimeout(tick, 3000); return; }
+      oks = 0;
+      if (r === "busy") return setTimeout(tick, 2000);
+      if (stage >= 3) return;
+      if (stage === 1) {
+        stage = 2;
+        console.warn("[cc-port] vista de claude.ai sin pintar; reiniciando su renderer");
+        return wc.forcefullyCrashRenderer();
+      }
+      stage++;
+      toggle(w);
+      setTimeout(tick, 1500);
+    };
+    setTimeout(tick, stage === 2 ? 1000 : 2000);
+  });
+});
 try { const f = path.join(os.homedir(), ".claude-port-debug.js"); if (fs.existsSync(f)) require(f); } catch (e) { console.error("[cc-port] debug hook", e); }
 require("./launcher.js");

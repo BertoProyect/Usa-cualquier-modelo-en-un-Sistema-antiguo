@@ -349,6 +349,8 @@ Necesita que `/Applications/Claude.app` (el port) esté instalado. La CLI parche
 | `example.com` abre `chrome-error` | El DNS del operador no la resolvía | DNS 1.1.1.1 / 8.8.8.8 |
 | `security import`: "MAC verification failed" | OpenSSL 3 exporta PKCS#12 moderno | Exportar con `-legacy` / 3DES / SHA1 |
 | "enclave key unavailable" en el log | El Mac no tiene Secure Enclave | Normal; no afecta |
+| Terminal de la pestaña Code: "No se ha podido iniciar el shell" (`posix_spawn failed: Permission denied`) | `asar extract/pack` pierde el bit `+x` de `node-pty/spawn-helper` (y `github-mcp-server`) | `build.sh` copia los permisos de ejecución del paquete original |
+| A veces la ventana se queda en el esqueleto gris al abrir; cerrando y abriendo vuelve | Al activar la ventana mientras arranca, la vista de claude.ai se queda marcada como oculta (`visibilityState: hidden`) y su compositor parado (`requestAnimationFrame` no avanza). Ni recargar ni ocultar/mostrar la ventana lo arreglan | `main-shim.js` lo vigila al arrancar: alterna la visibilidad de la vista y, si sigue parada, reinicia su renderer (que nace ya visible). Se recupera solo en unos 15 s |
 
 ## Qué no funciona (todavía)
 

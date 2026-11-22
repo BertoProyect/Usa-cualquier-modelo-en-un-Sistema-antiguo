@@ -48,6 +48,8 @@ if [ ! -f icon/Claude.icns ]; then [ -x icon/ext ] || clang -fobjc-arc -framewor
 if [ -f icon/Claude.icns ]; then cp icon/Claude.icns work/Claude.icns; else [ -x icon/flat ] || clang -fobjc-arc -framework AppKit icon/flat.m -o icon/flat; icon/flat "$ORIG" work/Claude.iconset >/dev/null && iconutil -c icns work/Claude.iconset -o work/Claude.icns; fi
 if [ -f work/Claude.icns ]; then cp work/Claude.icns "$C/Resources/electron.icns"; /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$P" 2>/dev/null || true; else echo "aviso: no se pudo generar el icono"; fi
 echo "[6/6] Firmando"
+# asar extract/pack pierde el bit +x (spawn-helper de node-pty, github-mcp-server)
+(cd "$ORIG/Contents/Resources/app.asar.unpacked" && find . -type f -perm -u+x) | while read -r f; do chmod +x "$C/Resources/app.asar.unpacked/$f"; done
 xattr -cr "$OUT"
 SIGN_ID=$(security find-identity -p codesigning 2>/dev/null | awk '/"Claude Port Local Signing"/{print $2; exit}')
 codesign --force --deep --sign "${SIGN_ID:--}" "$OUT" 2>&1 | tail -2 || true
