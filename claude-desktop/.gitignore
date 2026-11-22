@@ -1,0 +1,13 @@
+orig/
+dist/
+work/
+e32/
+e32.zip
+claude.zip
+tools/node_modules/
+icon/ext
+icon/flat
+icon/Claude.iconset/
+signing/*.pem
+signing/*.p12
+icon/Claude.icns
